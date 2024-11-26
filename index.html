@@ -26,7 +26,6 @@
 </head>
 <body>
   <h1>Video and Audio Sharing</h1>
-
   <h3>Your Peer ID: <span id="peerIdDisplay"></span></h3>
 
   <!-- Local Video -->
@@ -42,6 +41,7 @@
   </div>
 
   <script>
+    // Variables to access the video elements and buttons
     const localVideo = document.getElementById('localVideo');
     const remoteVideo = document.getElementById('remoteVideo');
     const peerIdInput = document.getElementById('peerId');
@@ -49,44 +49,51 @@
 
     let localStream;
 
-    // Create a PeerJS instance
+    // Create a PeerJS instance for the current user
     const peer = new Peer();
 
-    // Display the Peer ID when it's generated
+    // When the peer is created, display the Peer ID
     peer.on('open', (id) => {
       document.getElementById('peerIdDisplay').textContent = id;
-      alert(`Your Peer ID is: ${id}`);  // Optionally, keep this for immediate notification
+      alert(`Your Peer ID is: ${id}`);  // Also display the Peer ID in an alert (optional)
     });
 
-    // Get user's video and audio
+    // Request access to the user's camera and microphone
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       .then((stream) => {
         localStream = stream;
-        localVideo.srcObject = stream;
+        localVideo.srcObject = stream;  // Show the local stream in the video element
       })
-      .catch((error) => console.error('Error accessing media devices:', error));
+      .catch((error) => {
+        console.error('Error accessing media devices:', error);
+        alert('Error accessing your camera and microphone. Please allow permission.');
+      });
 
-    // Listen for incoming connections
+    // Listen for incoming calls from other peers
     peer.on('call', (call) => {
-      call.answer(localStream); // Answer with local video/audio stream
+      // Answer the call with the local stream
+      call.answer(localStream);
 
+      // When the remote stream arrives, display it in the remote video element
       call.on('stream', (remoteStream) => {
-        remoteVideo.srcObject = remoteStream; // Play remote video/audio
+        remoteVideo.srcObject = remoteStream;
       });
     });
 
-    // Connect to another peer
+    // Event handler to connect to another peer when the button is clicked
     connectBtn.addEventListener('click', () => {
       const peerId = peerIdInput.value;
 
       if (peerId) {
+        // Make a call to the other peer
         const call = peer.call(peerId, localStream);
 
+        // When the remote stream arrives, display it in the remote video element
         call.on('stream', (remoteStream) => {
           remoteVideo.srcObject = remoteStream;
         });
       } else {
-        alert('Please enter a Peer ID.');
+        alert('Please enter a valid Peer ID.');
       }
     });
   </script>
