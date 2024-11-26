@@ -27,6 +27,8 @@
 <body>
   <h1>Video and Audio Sharing</h1>
 
+  <h3>Your Peer ID: <span id="peerIdDisplay"></span></h3>
+
   <!-- Local Video -->
   <video id="localVideo" autoplay muted playsinline></video>
 
@@ -50,8 +52,10 @@
     // Create a PeerJS instance
     const peer = new Peer();
 
+    // Display the Peer ID when it's generated
     peer.on('open', (id) => {
-      alert(`Your Peer ID is: ${id}`);
+      document.getElementById('peerIdDisplay').textContent = id;
+      alert(`Your Peer ID is: ${id}`);  // Optionally, keep this for immediate notification
     });
 
     // Get user's video and audio
