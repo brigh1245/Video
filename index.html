@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Video and Audio Sharing (WebRTC)</title>
+  <title>Simple WebRTC Video Call</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -16,18 +16,16 @@
       max-width: 600px;
       margin: 10px auto;
     }
-    input, button {
-      margin: 10px;
+    button {
       padding: 10px;
       font-size: 16px;
+      margin: 10px;
     }
   </style>
 </head>
 <body>
-  <h1>Video and Audio Sharing</h1>
-
-  <h3>Your Session ID: <span id="sessionIdDisplay"></span></h3>
-
+  <h1>Simple WebRTC Video Call</h1>
+  
   <!-- Local Video -->
   <video id="localVideo" autoplay muted playsinline></video>
 
@@ -35,119 +33,83 @@
   <video id="remoteVideo" autoplay playsinline></video>
 
   <div>
-    <label for="offer">Enter SDP Offer:</label>
-    <input type="text" id="offer" placeholder="Enter SDP Offer" />
-    <button id="connectBtn">Connect</button>
+    <button id="startBtn">Start Call</button>
   </div>
 
   <script>
-    // Get video elements and buttons
-    const localVideo = document.getElementById('localVideo');
-    const remoteVideo = document.getElementById('remoteVideo');
-    const offerInput = document.getElementById('offer');
-    const connectBtn = document.getElementById('connectBtn');
-
     let localStream;
     let peerConnection;
     let remoteStream;
-    let sessionId = Math.floor(Math.random() * 10000);  // Random session ID to share
 
-    document.getElementById('sessionIdDisplay').textContent = sessionId;
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    const startBtn = document.getElementById('startBtn');
 
-    // ICE Server configuration (this will enable NAT traversal for peer connections)
+    // ICE Server configuration (STUN server used for NAT traversal)
     const iceServers = {
       iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },  // Google's public STUN server
-        { urls: "turn:YOUR_TURN_SERVER" }  // Optional: Add your TURN server here if needed
+        { urls: 'stun:stun.l.google.com:19302' }
       ]
     };
 
-    // Get user's media (video and audio)
+    // Get user media (video and audio)
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       .then((stream) => {
         localStream = stream;
-        localVideo.srcObject = stream;
+        localVideo.srcObject = stream; // Display local video
       })
       .catch((error) => {
-        console.error('Error accessing media devices:', error);
-        alert('Error accessing your camera and microphone. Please allow permission.');
+        alert('Error accessing media devices: ' + error);
+        console.error(error);
       });
 
-    // Create a new RTC connection
+    // Create a new PeerConnection and set up tracks and ICE candidates
     function createPeerConnection() {
       peerConnection = new RTCPeerConnection(iceServers);
 
-      // Add the local stream to the connection
+      // Add the local stream tracks to the connection
       localStream.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStream);
       });
 
-      // Set up the remote stream when a connection is established
+      // Handle the remote stream when the connection is established
       peerConnection.ontrack = (event) => {
         remoteStream = event.streams[0];
-        remoteVideo.srcObject = remoteStream;
+        remoteVideo.srcObject = remoteStream; // Display remote video
       };
 
-      // Handle ICE candidates (for establishing connection)
+      // ICE Candidate handling
       peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-          console.log("ICE Candidate:", event.candidate);
+          console.log('ICE Candidate: ', event.candidate);
         }
       };
     }
 
-    // Create an offer and share the SDP
-    connectBtn.addEventListener('click', () => {
-      if (!offerInput.value) {
-        alert("Please enter the SDP offer.");
-        return;
-      }
-
-      const sdpOffer = offerInput.value; // Get the SDP offer from the input
-      const sessionDescription = new RTCSessionDescription({
-        type: 'offer',
-        sdp: sdpOffer
-      });
-
-      // Create the peer connection and set the remote description
+    // Establish the WebRTC connection by creating offer and answer
+    function startCall() {
       createPeerConnection();
-      peerConnection.setRemoteDescription(sessionDescription)
-        .then(() => {
-          return peerConnection.createAnswer(); // Create an answer to the offer
-        })
-        .then((answer) => {
-          return peerConnection.setLocalDescription(answer); // Set the local answer
-        })
-        .then(() => {
-          // Optionally, send the SDP answer back to the offerer using signaling (e.g., WebSocket or REST)
-          alert("Connection Established!");
-        })
-        .catch((error) => {
-          console.error("Error during connection setup:", error);
-          alert("Error during connection setup.");
-        });
-    });
-
-    // Send the SDP Offer to the peer (this would normally happen through a signaling server)
-    // You need to manually copy the generated SDP Offer to the other peer and paste it into the input
-    function generateSDPOffer() {
-      createPeerConnection();
-
+      
+      // Create the offer (this is automatically handled by the browser)
       peerConnection.createOffer()
         .then((offer) => {
           return peerConnection.setLocalDescription(offer);
         })
         .then(() => {
-          offerInput.value = peerConnection.localDescription.sdp;  // Display the generated SDP offer
-          alert("SDP Offer is ready to be copied and shared!");
+          // Here you'd normally send the offer to the other peer using a signaling server
+          console.log("Offer created: ", peerConnection.localDescription.sdp);
         })
         .catch((error) => {
-          console.error("Error generating offer:", error);
+          console.error('Error starting the call: ', error);
+          alert('Error starting the call.');
         });
     }
 
-    // Call generateSDPOffer to generate an SDP offer and display it
-    window.onload = generateSDPOffer;
+    // When the user clicks the "Start Call" button, initiate the WebRTC call
+    startBtn.addEventListener('click', () => {
+      startCall();
+    });
+
   </script>
 </body>
 </html>
