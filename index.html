@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Video and Audio Sharing</title>
-  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.1/dist/peerjs.min.js"></script>
+  <title>Video and Audio Sharing (WebRTC)</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -26,7 +25,8 @@
 </head>
 <body>
   <h1>Video and Audio Sharing</h1>
-  <h3>Your Peer ID: <span id="peerIdDisplay"></span></h3>
+
+  <h3>Your Session ID: <span id="sessionIdDisplay"></span></h3>
 
   <!-- Local Video -->
   <video id="localVideo" autoplay muted playsinline></video>
@@ -35,67 +35,119 @@
   <video id="remoteVideo" autoplay playsinline></video>
 
   <div>
-    <label for="peerId">Enter Peer ID to Connect:</label>
-    <input type="text" id="peerId" placeholder="Peer ID">
+    <label for="offer">Enter SDP Offer:</label>
+    <input type="text" id="offer" placeholder="Enter SDP Offer" />
     <button id="connectBtn">Connect</button>
   </div>
 
   <script>
-    // Variables to access the video elements and buttons
+    // Get video elements and buttons
     const localVideo = document.getElementById('localVideo');
     const remoteVideo = document.getElementById('remoteVideo');
-    const peerIdInput = document.getElementById('peerId');
+    const offerInput = document.getElementById('offer');
     const connectBtn = document.getElementById('connectBtn');
 
     let localStream;
+    let peerConnection;
+    let remoteStream;
+    let sessionId = Math.floor(Math.random() * 10000);  // Random session ID to share
 
-    // Create a PeerJS instance for the current user
-    const peer = new Peer();
+    document.getElementById('sessionIdDisplay').textContent = sessionId;
 
-    // When the peer is created, display the Peer ID
-    peer.on('open', (id) => {
-      document.getElementById('peerIdDisplay').textContent = id;
-      alert(`Your Peer ID is: ${id}`);  // Also display the Peer ID in an alert (optional)
-    });
+    // ICE Server configuration (this will enable NAT traversal for peer connections)
+    const iceServers = {
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },  // Google's public STUN server
+        { urls: "turn:YOUR_TURN_SERVER" }  // Optional: Add your TURN server here if needed
+      ]
+    };
 
-    // Request access to the user's camera and microphone
+    // Get user's media (video and audio)
     navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       .then((stream) => {
         localStream = stream;
-        localVideo.srcObject = stream;  // Show the local stream in the video element
+        localVideo.srcObject = stream;
       })
       .catch((error) => {
         console.error('Error accessing media devices:', error);
         alert('Error accessing your camera and microphone. Please allow permission.');
       });
 
-    // Listen for incoming calls from other peers
-    peer.on('call', (call) => {
-      // Answer the call with the local stream
-      call.answer(localStream);
+    // Create a new RTC connection
+    function createPeerConnection() {
+      peerConnection = new RTCPeerConnection(iceServers);
 
-      // When the remote stream arrives, display it in the remote video element
-      call.on('stream', (remoteStream) => {
-        remoteVideo.srcObject = remoteStream;
+      // Add the local stream to the connection
+      localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localStream);
       });
-    });
 
-    // Event handler to connect to another peer when the button is clicked
+      // Set up the remote stream when a connection is established
+      peerConnection.ontrack = (event) => {
+        remoteStream = event.streams[0];
+        remoteVideo.srcObject = remoteStream;
+      };
+
+      // Handle ICE candidates (for establishing connection)
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          console.log("ICE Candidate:", event.candidate);
+        }
+      };
+    }
+
+    // Create an offer and share the SDP
     connectBtn.addEventListener('click', () => {
-      const peerId = peerIdInput.value;
-
-      if (peerId) {
-        // Make a call to the other peer
-        const call = peer.call(peerId, localStream);
-
-        // When the remote stream arrives, display it in the remote video element
-        call.on('stream', (remoteStream) => {
-          remoteVideo.srcObject = remoteStream;
-        });
-      } else {
-        alert('Please enter a valid Peer ID.');
+      if (!offerInput.value) {
+        alert("Please enter the SDP offer.");
+        return;
       }
+
+      const sdpOffer = offerInput.value; // Get the SDP offer from the input
+      const sessionDescription = new RTCSessionDescription({
+        type: 'offer',
+        sdp: sdpOffer
+      });
+
+      // Create the peer connection and set the remote description
+      createPeerConnection();
+      peerConnection.setRemoteDescription(sessionDescription)
+        .then(() => {
+          return peerConnection.createAnswer(); // Create an answer to the offer
+        })
+        .then((answer) => {
+          return peerConnection.setLocalDescription(answer); // Set the local answer
+        })
+        .then(() => {
+          // Optionally, send the SDP answer back to the offerer using signaling (e.g., WebSocket or REST)
+          alert("Connection Established!");
+        })
+        .catch((error) => {
+          console.error("Error during connection setup:", error);
+          alert("Error during connection setup.");
+        });
     });
+
+    // Send the SDP Offer to the peer (this would normally happen through a signaling server)
+    // You need to manually copy the generated SDP Offer to the other peer and paste it into the input
+    function generateSDPOffer() {
+      createPeerConnection();
+
+      peerConnection.createOffer()
+        .then((offer) => {
+          return peerConnection.setLocalDescription(offer);
+        })
+        .then(() => {
+          offerInput.value = peerConnection.localDescription.sdp;  // Display the generated SDP offer
+          alert("SDP Offer is ready to be copied and shared!");
+        })
+        .catch((error) => {
+          console.error("Error generating offer:", error);
+        });
+    }
+
+    // Call generateSDPOffer to generate an SDP offer and display it
+    window.onload = generateSDPOffer;
   </script>
 </body>
 </html>
