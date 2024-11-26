@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video and Audio Sharing</title>
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.1/dist/peerjs.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 20px;
+    }
+    video {
+      border: 2px solid #ccc;
+      width: 100%;
+      max-width: 600px;
+      margin: 10px auto;
+    }
+    input, button {
+      margin: 10px;
+      padding: 10px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Video and Audio Sharing</h1>
+
+  <!-- Local Video -->
+  <video id="localVideo" autoplay muted playsinline></video>
+
+  <!-- Remote Video -->
+  <video id="remoteVideo" autoplay playsinline></video>
+
+  <div>
+    <label for="peerId">Enter Peer ID to Connect:</label>
+    <input type="text" id="peerId" placeholder="Peer ID">
+    <button id="connectBtn">Connect</button>
+  </div>
+
+  <script>
+    const localVideo = document.getElementById('localVideo');
+    const remoteVideo = document.getElementById('remoteVideo');
+    const peerIdInput = document.getElementById('peerId');
+    const connectBtn = document.getElementById('connectBtn');
+
+    let localStream;
+
+    // Create a PeerJS instance
+    const peer = new Peer();
+
+    peer.on('open', (id) => {
+      alert(`Your Peer ID is: ${id}`);
+    });
+
+    // Get user's video and audio
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      .then((stream) => {
+        localStream = stream;
+        localVideo.srcObject = stream;
+      })
+      .catch((error) => console.error('Error accessing media devices:', error));
+
+    // Listen for incoming connections
+    peer.on('call', (call) => {
+      call.answer(localStream); // Answer with local video/audio stream
+
+      call.on('stream', (remoteStream) => {
+        remoteVideo.srcObject = remoteStream; // Play remote video/audio
+      });
+    });
+
+    // Connect to another peer
+    connectBtn.addEventListener('click', () => {
+      const peerId = peerIdInput.value;
+
+      if (peerId) {
+        const call = peer.call(peerId, localStream);
+
+        call.on('stream', (remoteStream) => {
+          remoteVideo.srcObject = remoteStream;
+        });
+      } else {
+        alert('Please enter a Peer ID.');
+      }
+    });
+  </script>
+</body>
+</html>
